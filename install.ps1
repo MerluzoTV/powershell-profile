@@ -40,9 +40,9 @@ foreach ($app in $apps) {
 Update-SessionPath
 
 # 3. Instalación de la fuente tipográfica obligatoria (Nerd Font para iconos)
-Write-Host "`n🎨 Instalando CaskaydiaCove Nerd Font (Requerida para iconos de la terminal)..." -ForegroundColor Yellow
+Write-Host "`n🎨 Instalando JetBrainsMono Nerd Font (Requerida para iconos de la terminal)..." -ForegroundColor Yellow
 winget install --id Git.Git --source winget --silent --accept-source-agreements --accept-package-agreements | Out-Null # Asegurar Git por si acaso
-oh-my-posh font install cascadiacode | Out-Null
+oh-my-posh font install jetbrainsmono | Out-Null
 
 # 4. Módulos de PowerShell usados por el perfil
 $modules = @("Terminal-Icons", "posh-git", "PSFzf", "PSScriptAnalyzer", "z")
@@ -124,7 +124,7 @@ if ((Get-Command python -ErrorAction SilentlyContinue) -and -not (Get-Command pi
 Update-SessionPath
 
 Write-Host "`n✨ ¡Ecosistema base configurado con éxito!" -ForegroundColor Green
-Write-Host "💡 RECUERDA: Configura tu Terminal de Windows para usar la fuente 'CaskaydiaCove Nerd Font' para ver los iconos correctamente." -ForegroundColor Magenta
+Write-Host "💡 RECUERDA: Configura tu Terminal de Windows para usar la fuente 'JetBrainsMonoNL NFM' para ver los iconos correctamente." -ForegroundColor Magenta
 
 # ==============================================================================
 # 10. Verificación final: comprueba que todo lo anterior quedó realmente

@@ -4,6 +4,17 @@
 # ==============================================================================
 
 function global:update {
+    # Auto-elevación única (método WinUtil): si no somos admin, relanza esta
+    # misma función en una pwsh admin y cede el control. Así winget y choco
+    # corren juntos en UNA sola sesión elevada, sin ventanas ni UAC a mitad
+    # de proceso.
+    $currentPrincipal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+    if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Host "🔐 'update' necesita administrador (winget + choco en una sola sesión, sin ventanas extra)..." -ForegroundColor Yellow
+        Start-Process wt -Verb RunAs -ArgumentList "new-tab", "pwsh.exe", "-NoExit", "-Command", "update"
+        return
+    }
+
     $forceChocoList = @("Apple.Bonjour", "CreativeTechnology.OpenAL")
 
     $chocoMapping = @{
@@ -93,18 +104,13 @@ function global:update {
                 Write-Host "`n🚀 Actualizando todo el sistema con WinGet..." -ForegroundColor Green
                 winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements
                 
-                # OPTIMIZACIÓN: Solo abre la pestaña Admin si realmente hay paquetes retenidos en Chocolatey
+                # Ya estamos elevados (self-elevate al entrar en la función),
+                # así que choco corre aquí mismo, sin abrir nada más.
                 if ($chocoInstalled -and $chocoOutdatedPackages) {
-                    Write-Host "`n🔄 Forzando actualización masiva de Chocolatey en tu pestaña 'admin'..." -ForegroundColor Cyan
-                    
-                    $subCmd = "Write-Host '🍫 Ejecutando actualización masiva vía Chocolatey (Modo Admin)...' -ForegroundColor Cyan; choco upgrade all -y"
-                    $bytes = [System.Text.Encoding]::Unicode.GetBytes($subCmd)
-                    $encodedCmd = [Convert]::ToBase64String($bytes)
-                    
-                    $arguments = "nt -p `"PowerShell`" pwsh.exe -NoExit -EncodedCommand $encodedCmd"
-                    Start-Process wt.exe -ArgumentList $arguments -Verb RunAs
+                    Write-Host "`n🍫 Actualizando todo con Chocolatey..." -ForegroundColor Cyan
+                    choco upgrade all -y
                 } elseif ($chocoInstalled) {
-                    Write-Host "`n✅ Chocolatey ya estaba limpio. No se requiere elevación." -ForegroundColor Green
+                    Write-Host "`n✅ Chocolatey ya estaba limpio." -ForegroundColor Green
                 }
             }
             "2" {
@@ -124,14 +130,8 @@ function global:update {
                     if (-not $success) {
                         if ($chocoInstalled) {
                             $chocoName = if ($chocoMapping.ContainsKey($id)) { $chocoMapping[$id] } else { $id.ToLower() }
-                            Write-Host "`n🔄 WinGet falló o requiere rescate. Intentando con Chocolatey para '$chocoName'..." -ForegroundColor Cyan
-                            
-                            $subCmd = "Write-Host '🍫 Ejecutando actualización de rescate vía Chocolatey...' -ForegroundColor Cyan; choco upgrade $chocoName -y"
-                            $bytes = [System.Text.Encoding]::Unicode.GetBytes($subCmd)
-                            $encodedCmd = [Convert]::ToBase64String($bytes)
-                            
-                            $arguments = "nt -p `"PowerShell`" pwsh.exe -NoExit -EncodedCommand $encodedCmd"
-                            Start-Process wt.exe -ArgumentList $arguments -Verb RunAs
+                            Write-Host "`n🔄 WinGet falló o requiere rescate. Actualizando con Chocolatey ('$chocoName')..." -ForegroundColor Cyan
+                            choco upgrade $chocoName -y
                         } else {
                             Write-Host "`n⚠️ WinGet falló y Chocolatey no está disponible para rescate." -ForegroundColor Red
                         }

@@ -37,7 +37,7 @@ El script:
   PATH).
 - Deja un "puente" en `$PROFILE` si hiciera falta.
 - Instala VS Code si falta.
-- Configura Windows Terminal: fuente `CaskaydiaCove Nerd Font` y perfil de
+- Configura Windows Terminal: fuente `JetBrainsMonoNL NFM` y perfil de
   PowerShell por defecto (con copia de seguridad de `settings.json` antes de tocarlo).
 
 Restart de Windows Terminal al terminar y listo.
@@ -68,7 +68,7 @@ cd "$env:OneDrive\Dokumente\PowerShell"
 ```
 
 **Paso 4 — Windows Terminal a mano:** `Ctrl + ,` > perfil PowerShell > Apariencia >
-fuente `CaskaydiaCove Nerd Font`. Fija PowerShell 7 como perfil predeterminado.
+fuente `JetBrainsMonoNL NFM`. Fija PowerShell 7 como perfil predeterminado.
 
 </details>
 

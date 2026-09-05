@@ -216,7 +216,7 @@ try {
         $pwshProfile = $json.profiles.list | Where-Object { $_.commandline -match 'pwsh\.exe$' -or $_.source -eq 'Windows.Terminal.PowershellCore' } | Select-Object -First 1
         if ($pwshProfile) {
             if (-not $pwshProfile.font) { $pwshProfile | Add-Member -NotePropertyName font -NotePropertyValue ([pscustomobject]@{}) -Force }
-            $pwshProfile.font | Add-Member -NotePropertyName face -NotePropertyValue "CaskaydiaCove Nerd Font" -Force
+            $pwshProfile.font | Add-Member -NotePropertyName face -NotePropertyValue "JetBrainsMonoNL NFM" -Force
             $json.defaultProfile = $pwshProfile.guid
             $backupSettings = "$($wtSettingsPath.FullName).bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
             Copy-Item $wtSettingsPath.FullName $backupSettings
@@ -230,7 +230,7 @@ try {
     }
 } catch {
     Write-Warn2 "No se pudo configurar Windows Terminal automaticamente: $($_.Exception.Message)"
-    Write-Warn2 "Hazlo a mano: Ctrl+, > perfil PowerShell > Apariencia > fuente 'CaskaydiaCove Nerd Font'."
+    Write-Warn2 "Hazlo a mano: Ctrl+, > perfil PowerShell > Apariencia > fuente 'JetBrainsMonoNL NFM'."
 }
 
 # -----------------------------------------------------------------------------
