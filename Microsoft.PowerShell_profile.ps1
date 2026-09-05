@@ -48,6 +48,7 @@ Set-PSReadLineKeyHandler -Chord 'Ctrl+LeftArrow' -Function BackwardWord
 Set-PSReadLineKeyHandler -Chord 'Ctrl+RightArrow' -Function ForwardWord
 Set-PSReadLineKeyHandler -Chord 'Ctrl+z' -Function Undo
 Set-PSReadLineKeyHandler -Chord 'Ctrl+y' -Function Redo
+Set-PSReadLineKeyHandler -Chord 'Shift+Enter' -Function AddLine
 
 # Functions
 function Update-Profile {
