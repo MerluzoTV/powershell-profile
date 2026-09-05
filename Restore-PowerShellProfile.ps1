@@ -204,20 +204,42 @@ if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
 }
 
 # -----------------------------------------------------------------------------
-# 7. Windows Terminal: fuente Nerd Font + PowerShell 7 como perfil por defecto,
-#    igual que lo tienes configurado ahora mismo. Hace copia de seguridad de
-#    settings.json antes de tocarlo.
+# 7. Windows Terminal: apariencia completa (fuente, esquema de color,
+#    transparencia/acrylic) + PowerShell 7 como perfil por defecto, igual que
+#    lo tienes configurado ahora mismo (05.09.2026). Hace copia de seguridad
+#    de settings.json antes de tocarlo.
+#
+#    NOTA: un reinstall de Windows Terminal borra su settings.json por
+#    completo (LocalState) -- hasta ahora este paso solo restauraba fuente +
+#    perfil por defecto, y el esquema de color/transparencia se perdía sin
+#    posibilidad de recuperarlo (pasó el 05.09.2026: reinstalar WT para
+#    arreglar el crash de elevación dejó la terminal con fondo negro por
+#    defecto). Si vuelves a cambiar el look de WT a mano, actualiza estos
+#    valores para que la próxima restauración coincida.
 # -----------------------------------------------------------------------------
-Write-Step "Configurando Windows Terminal (fuente Nerd Font + PowerShell 7 por defecto)..."
+$wtColorScheme = "Dark+"          # esquema de color (uno de los que trae WT de fábrica, no hace falta definirlo en "schemes")
+$wtFontFace    = "JetBrainsMonoNL NFM"
+$wtOpacity     = 80
+$wtUseAcrylic  = $true
+
+Write-Step "Configurando Windows Terminal (fuente + esquema de color + transparencia + PowerShell 7 por defecto)..."
 try {
     $wtSettingsPath = Get-ChildItem "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json" -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($wtSettingsPath) {
         $json = Get-Content $wtSettingsPath.FullName -Raw | ConvertFrom-Json
         $pwshProfile = $json.profiles.list | Where-Object { $_.commandline -match 'pwsh\.exe$' -or $_.source -eq 'Windows.Terminal.PowershellCore' } | Select-Object -First 1
         if ($pwshProfile) {
-            if (-not $pwshProfile.font) { $pwshProfile | Add-Member -NotePropertyName font -NotePropertyValue ([pscustomobject]@{}) -Force }
-            $pwshProfile.font | Add-Member -NotePropertyName face -NotePropertyValue "JetBrainsMonoNL NFM" -Force
+            if (-not $json.profiles.defaults) { $json.profiles | Add-Member -NotePropertyName defaults -NotePropertyValue ([pscustomobject]@{}) -Force }
+            $defaults = $json.profiles.defaults
+            $defaults | Add-Member -NotePropertyName colorScheme -NotePropertyValue $wtColorScheme -Force
+            if (-not $defaults.font) { $defaults | Add-Member -NotePropertyName font -NotePropertyValue ([pscustomobject]@{}) -Force }
+            $defaults.font | Add-Member -NotePropertyName face -NotePropertyValue $wtFontFace -Force
+            $defaults | Add-Member -NotePropertyName opacity -NotePropertyValue $wtOpacity -Force
+            $defaults | Add-Member -NotePropertyName useAcrylic -NotePropertyValue $wtUseAcrylic -Force
+            $json | Add-Member -NotePropertyName useAcrylicInTabRow -NotePropertyValue $true -Force
+
             $json.defaultProfile = $pwshProfile.guid
+
             $backupSettings = "$($wtSettingsPath.FullName).bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
             Copy-Item $wtSettingsPath.FullName $backupSettings
             ($json | ConvertTo-Json -Depth 20) | Set-Content $wtSettingsPath.FullName -Encoding UTF8
@@ -230,7 +252,7 @@ try {
     }
 } catch {
     Write-Warn2 "No se pudo configurar Windows Terminal automaticamente: $($_.Exception.Message)"
-    Write-Warn2 "Hazlo a mano: Ctrl+, > perfil PowerShell > Apariencia > fuente 'JetBrainsMonoNL NFM'."
+    Write-Warn2 "Hazlo a mano: Ctrl+, > Ajustes por defecto > esquema '$wtColorScheme', fuente '$wtFontFace', opacidad $wtOpacity%, acrylic activado."
 }
 
 # -----------------------------------------------------------------------------
