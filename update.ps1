@@ -3,6 +3,82 @@
 # Descripción: Gestor dinámico de actualizaciones multiplataforma (WinGet + Chocolatey)
 # ==============================================================================
 
+# Parsea la tabla de "winget upgrade --include-unknown" para sacar solo los IDs
+# pendientes -- recorta por posición de columna (donde empieza "ID" y "Version"
+# en la cabecera), no por espacios, porque el nombre de la app puede traerlos
+# ("Epic Online Services", "OBS Studio"...). Si winget cambia el formato de
+# tabla o el idioma del sistema, esto puede dejar de encontrar la cabecera y
+# simplemente devuelve @() sin romper el resto del script.
+function Get-WingetUpgradeIds {
+    $lines = winget upgrade --include-unknown | Out-String -Stream
+    $headerLineObj = $lines | Select-String -Pattern '^Name\s+ID\s+Version'
+    if (-not $headerLineObj) { return @() }
+    $headerIndex = $headerLineObj.LineNumber - 1
+    $headerLine = $lines[$headerIndex]
+    $idStart = $headerLine.IndexOf("ID")
+    $versionStart = $headerLine.IndexOf("Version")
+    $results = @()
+    for ($i = $headerIndex + 2; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ([string]::IsNullOrWhiteSpace($line)) { break }
+        if ($line -match '^\d+\s') { break }   # línea de resumen ("3 Aktualisierungen...", "3 Pakete...")
+        if ($line.Length -lt $idStart) { break }
+        $endIdx = if ($versionStart -gt $idStart -and $versionStart -le $line.Length) { $versionStart } else { $line.Length }
+        $id = $line.Substring($idStart, $endIdx - $idStart).Trim()
+        if ($id) { $results += $id }
+    }
+    return $results
+}
+
+# Intenta actualizar un paquete de WinGet con reintentos progresivos:
+#   1) upgrade normal
+#   2) si falla, desinstalar + instalar limpio -- cubre tanto "la nueva
+#      versión usa otra tecnología de instalador" (WinGet rechaza el upgrade
+#      in-place) como bloqueos de archivo puntuales que ya se liberaron
+#   3) si sigue fallando, o el paquete está en $ForceChocoList, Chocolatey
+function Update-WingetPackage {
+    param(
+        [Parameter(Mandatory)][string]$Id,
+        [hashtable]$ChocoMapping = @{},
+        [string[]]$ForceChocoList = @(),
+        [bool]$ChocoInstalled = $false
+    )
+
+    $useChocoDirect = $ChocoInstalled -and ($ForceChocoList -contains $Id)
+    $ok = $false
+
+    if (-not $useChocoDirect) {
+        Write-Host "  📥 $Id (WinGet)..." -ForegroundColor Blue
+        $p = Start-Process winget -ArgumentList "upgrade --id $Id --accept-package-agreements --accept-source-agreements" -NoNewWindow -PassThru -Wait
+        $ok = ($p.ExitCode -eq 0)
+
+        if (-not $ok) {
+            Write-Host "  🔁 Upgrade normal falló. Reinstalando limpio ($Id)..." -ForegroundColor Yellow
+            Start-Process winget -ArgumentList "uninstall --id $Id" -NoNewWindow -Wait | Out-Null
+            $p2 = Start-Process winget -ArgumentList "install --id $Id --accept-package-agreements --accept-source-agreements" -NoNewWindow -PassThru -Wait
+            $ok = ($p2.ExitCode -eq 0)
+
+            if (-not $ok) {
+                # A veces es un antivirus escaneando los ficheros recien
+                # extraidos del instalador (carrera, no bloqueo real) -- un
+                # segundo intento tras una pausa corta suele bastar.
+                Start-Sleep -Seconds 3
+                Write-Host "  🔁 Reintentando instalación una vez más..." -ForegroundColor Yellow
+                $p3 = Start-Process winget -ArgumentList "install --id $Id --accept-package-agreements --accept-source-agreements" -NoNewWindow -PassThru -Wait
+                $ok = ($p3.ExitCode -eq 0)
+            }
+        }
+    }
+
+    if (-not $ok -and $ChocoInstalled) {
+        $chocoName = if ($ChocoMapping.ContainsKey($Id)) { $ChocoMapping[$Id] } else { $Id.ToLower() }
+        Write-Host "  🍫 Intentando con Chocolatey ('$chocoName')..." -ForegroundColor Cyan
+        choco upgrade $chocoName -y
+    } elseif (-not $ok) {
+        Write-Host "  ⚠️ No se pudo actualizar $Id (WinGet falló, sin Chocolatey de rescate)." -ForegroundColor Red
+    }
+}
+
 function global:update {
     # Auto-elevación única (método WinUtil): si no somos admin, relanza esta
     # misma función en una pwsh admin y cede el control. Así winget y choco
@@ -20,6 +96,7 @@ function global:update {
     $chocoMapping = @{
         "Apple.Bonjour"             = "apple-bonjour"
         "CreativeTechnology.OpenAL" = "openal"
+        "OBSProject.OBSStudio"      = "obs-studio"
     }
 
     do {
@@ -103,7 +180,15 @@ function global:update {
             "1" {
                 Write-Host "`n🚀 Actualizando todo el sistema con WinGet..." -ForegroundColor Green
                 winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements
-                
+
+                $stillOutdated = Get-WingetUpgradeIds
+                if ($stillOutdated.Count -gt 0) {
+                    Write-Host "`n🔁 $($stillOutdated.Count) paquete(s) no se actualizaron en el paso masivo -- reintentando uno a uno..." -ForegroundColor Yellow
+                    foreach ($id in $stillOutdated) {
+                        Update-WingetPackage -Id $id -ChocoMapping $chocoMapping -ForceChocoList $forceChocoList -ChocoInstalled $chocoInstalled
+                    }
+                }
+
                 # Ya estamos elevados (self-elevate al entrar en la función),
                 # así que choco corre aquí mismo, sin abrir nada más.
                 if ($chocoInstalled -and $chocoOutdatedPackages) {
@@ -116,26 +201,7 @@ function global:update {
             "2" {
                 $id = Read-Host "`nIntroduce el ID de la aplicación"
                 if (-not [string]::IsNullOrWhiteSpace($id)) {
-                    
-                    $usarChocoNativo = $chocoInstalled -and ($forceChocoList -contains $id)
-
-                    if (-not $usarChocoNativo) {
-                        Write-Host "`n🚀 Intentando actualizar $id con WinGet..." -ForegroundColor Green
-                        $process = Start-Process winget -ArgumentList "upgrade --id $id --accept-package-agreements --accept-source-agreements" -NoNewWindow -PassThru -Wait
-                        $success = ($process.ExitCode -eq 0)
-                    } else {
-                        $success = $false
-                    }
-
-                    if (-not $success) {
-                        if ($chocoInstalled) {
-                            $chocoName = if ($chocoMapping.ContainsKey($id)) { $chocoMapping[$id] } else { $id.ToLower() }
-                            Write-Host "`n🔄 WinGet falló o requiere rescate. Actualizando con Chocolatey ('$chocoName')..." -ForegroundColor Cyan
-                            choco upgrade $chocoName -y
-                        } else {
-                            Write-Host "`n⚠️ WinGet falló y Chocolatey no está disponible para rescate." -ForegroundColor Red
-                        }
-                    }
+                    Update-WingetPackage -Id $id -ChocoMapping $chocoMapping -ForceChocoList $forceChocoList -ChocoInstalled $chocoInstalled
                 } else {
                     Write-Host "❌ ID no válido." -ForegroundColor Red
                 }
