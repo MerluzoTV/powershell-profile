@@ -105,6 +105,7 @@ Todo lo anterior lo instala y verifica automáticamente `install.ps1`.
 | `myip` | Muestra tu IP de red local y tu IP pública. |
 | `admin` | Lanza una pestaña nueva de la terminal con permisos de Administrador. |
 | `claude` | Wrapper de Claude Code, siempre con `--dangerously-skip-permissions` (definido en `CTTcustom.ps1`). |
+| `Ctrl+Alt+T` / `Ctrl+Alt+Shift+T` | Atajos globales (no hace falta tener una terminal abierta) para Windows Terminal normal / elevado. El segundo lo crea `Restore-PowerShellProfile.ps1` como acceso directo en el Menú Inicio. |
 
 ---
 

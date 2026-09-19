@@ -280,6 +280,30 @@ Write-Host "    no es cosa de este script -- revisa 'Aplicacion de terminal pred
 Write-Host "    en Configuracion de Windows. Ver README > Troubleshooting." -ForegroundColor DarkGray
 
 # -----------------------------------------------------------------------------
+# 7b. Atajo global Ctrl+Alt+Shift+T: abre Windows Terminal elevado (equivalente
+#     al alias 'admin' del perfil). El atajo normal Ctrl+Alt+T ya lo crea el
+#     propio instalador de Windows Terminal (acceso directo "Windows
+#     Terminal.lnk" en el Menu Inicio) -- no hay que tocarlo, solo anadimos el
+#     segundo, para terminal elevada. Idempotente: sobreescribe el .lnk si ya
+#     existia.
+# -----------------------------------------------------------------------------
+Write-Step "Configurando atajo Ctrl+Alt+Shift+T (Windows Terminal elevado)..."
+try {
+    $adminShortcutPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Windows Terminal (Admin).lnk"
+    $wsh = New-Object -ComObject WScript.Shell
+    $shortcut = $wsh.CreateShortcut($adminShortcutPath)
+    $shortcut.TargetPath = (Get-Command pwsh).Source
+    $shortcut.Arguments = '-NoLogo -NoProfile -WindowStyle Hidden -Command "Start-Process wt -Verb RunAs"'
+    $shortcut.IconLocation = "$env:LOCALAPPDATA\Microsoft\WindowsApps\wt.exe,0"
+    $shortcut.Hotkey = "Ctrl+Alt+Shift+T"
+    $shortcut.Description = "Abre Windows Terminal elevado (equivalente al alias 'admin')"
+    $shortcut.Save()
+    Write-Ok "Atajo creado/actualizado: Ctrl+Alt+Shift+T -> Windows Terminal elevado."
+} catch {
+    Write-Warn2 "No se pudo crear el atajo de terminal elevada: $($_.Exception.Message)"
+}
+
+# -----------------------------------------------------------------------------
 # 8. Resumen final.
 # -----------------------------------------------------------------------------
 Write-Host ""
