@@ -5,5 +5,10 @@ function global:claude {
         Write-Warning "Claude Code no encontrado en $claudeExe. Ejecuta install.ps1 para instalarlo."
         return
     }
-    & $claudeExe --dangerously-skip-permissions @args
+    Push-Location "C:\Users\alegu\IA"
+    try {
+        & $claudeExe --dangerously-skip-permissions @args
+    } finally {
+        Pop-Location
+    }
 }
